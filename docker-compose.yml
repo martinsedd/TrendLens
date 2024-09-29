@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongo_ts
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data:/data/db
+  redis:
+    image: redis:alpine
+    container_name: redis_ts
+    ports:
+      - "6379:6379"
