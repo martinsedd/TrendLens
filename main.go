@@ -27,6 +27,9 @@ func main() {
 	router.HandleFunc("/stored_posts", func(w http.ResponseWriter, r *http.Request) {
 		handlers.FetchTrendingInDB(w, r, collection)
 	}).Methods("GET")
+	router.HandleFunc("/filtered_posts", func(w http.ResponseWriter, r *http.Request) {
+		handlers.FetchFilteredPostsHandler(w, r, collection)
+	}).Methods("GET")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000"},

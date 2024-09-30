@@ -16,6 +16,7 @@ require (
 	github.com/go-co-op/gocron v1.37.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.4.0 // indirect
+	github.com/jonreiter/govader v0.0.0-20230129030235-c72a790a959e // indirect
 	github.com/klauspost/compress v1.17.10 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
@@ -27,4 +28,5 @@ require (
 	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
+	gonum.org/v1/gonum v0.8.2 // indirect
 )

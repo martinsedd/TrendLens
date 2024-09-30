@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jonreiter/govader"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -130,7 +131,18 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 }
 
 func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost) error {
+	analyzer := govader.NewSentimentIntensityAnalyzer()
+
 	for _, post := range posts {
+		sentiment := analyzer.PolarityScores(post.Name)
+
+		sentimentLabel := "neutral"
+		if sentiment.Compound >= 0.05 {
+			sentimentLabel = "positive"
+		} else if sentiment.Compound <= -0.05 {
+			sentimentLabel = "negative"
+		}
+
 		filter := bson.M{"id": post.ID}
 		var existingPost models.RedditPost
 
@@ -148,6 +160,7 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 				"perma_link":  "https://reddit.com/r/all/comments/" + post.ID,
 				"url":         "https://reddit.com/r/all/comments/" + post.ID,
 				"inserted_at": time.Now(),
+				"sentiment":   sentimentLabel,
 			},
 		}
 
