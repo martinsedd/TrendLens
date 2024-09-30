@@ -1,6 +1,6 @@
 package models
 
-type TrendingTopic struct {
+type TrendingPost struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
 	VolumeUp   int    `json:"volume_up"`

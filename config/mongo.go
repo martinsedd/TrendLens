@@ -32,3 +32,13 @@ func InitializeMongoClient() *mongo.Client {
 	MongoClient = client
 	return client
 }
+
+func DisconnectMongoClient() {
+	if MongoClient != nil {
+		err := MongoClient.Disconnect(context.TODO())
+		if err != nil {
+			log.Fatalf("Failed to disconnect from MongoDB: %v", err)
+		}
+		fmt.Println("Disconnected from MongoDB!")
+	}
+}

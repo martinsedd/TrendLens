@@ -3,9 +3,7 @@ package main
 import (
 	"backend/config"
 	"backend/handlers"
-	"backend/services"
-	"fmt"
-	"github.com/go-redis/redis/v8"
+	"backend/scheduler"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -13,44 +11,31 @@ import (
 	"net/http"
 )
 
-var redisClient *redis.Client
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		return
-	}
-	config.InitializeMongoClient()
-
-	topics, err := services.FetchRedditTrendingTopics()
-	if err != nil {
-		log.Fatalf("Error fetching Reddit trending topics: %v", err)
+		log.Fatal("Error loading .env file")
 	}
 
-	err = services.StoreRedditPosts(topics)
-	if err != nil {
-		log.Fatalf("Error storing Reddit posts: %v", err)
-	}
+	client := config.InitializeMongoClient()
+	collection := client.Database("trendlens").Collection("reddit_posts")
 
-	log.Println("Reddit trending topics successfully fetched and stored in MongoDB.")
+	scheduler.StartRedditScheduler(collection)
 
 	router := mux.NewRouter()
-	router.HandleFunc("/trending", handlers.TrendingTopicsHandler).Methods("GET")
+	router.HandleFunc("/trending", handlers.TrendingHandler).Methods("GET")
+	router.HandleFunc("/stored_posts", func(w http.ResponseWriter, r *http.Request) {
+		handlers.FetchTrendingInDB(w, r, collection)
+	}).Methods("GET")
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedMethods:   []string{"GET"},
 		AllowedHeaders:   []string{"Content-Type"},
 		AllowCredentials: true,
 	})
-
 	handler := c.Handler(router)
 
-	response, err := services.FetchRedditTrendingTopics()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Print(response)
-	fmt.Println("Server is running on port 8080")
+	log.Println("Server is running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", handler))
 }

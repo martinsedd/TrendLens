@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
 	"net/http"
@@ -128,9 +129,7 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 	return trendingPosts, nil
 }
 
-func StoreRedditPosts(posts []models.TrendingPost) error {
-	collection := config.MongoClient.Database("trendlens").Collection("reddit_posts")
-
+func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost) error {
 	for _, post := range posts {
 		filter := bson.M{"id": post.ID}
 		var existingPost models.RedditPost
@@ -192,6 +191,24 @@ func StoreRedditPosts(posts []models.TrendingPost) error {
 	return nil
 }
 
-func RetrieveRedditPosts() {
+func RetrieveRedditData(collection *mongo.Collection) ([]models.RedditPost, error) {
+	filter := bson.M{}
 
+	cursor, err := collection.Find(context.Background(), filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve Reddit posts from MongoDB: %v", err)
+	}
+	defer func(cursor *mongo.Cursor, ctx context.Context) {
+		err := cursor.Close(ctx)
+		if err != nil {
+			fmt.Println("Failed to close cursor: ", err)
+		}
+	}(cursor, context.Background())
+
+	var posts []models.RedditPost
+	if err = cursor.All(context.Background(), &posts); err != nil {
+		return nil, fmt.Errorf("failed to decode Reddit posts from cursor: %v", err)
+	}
+
+	return posts, nil
 }
