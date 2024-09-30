@@ -1,48 +1,56 @@
 package main
 
 import (
-	"context"
+	"backend/config"
+	"backend/handlers"
+	"backend/services"
 	"fmt"
-	"log"
-
 	"github.com/go-redis/redis/v8"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"github.com/rs/cors"
+	"log"
+	"net/http"
 )
 
 var redisClient *redis.Client
 
-func initMongo() *mongo.Client {
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+func main() {
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		return
+	}
+	config.InitializeMongoClient()
+
+	topics, err := services.FetchRedditTrendingTopics()
+	if err != nil {
+		log.Fatalf("Error fetching Reddit trending topics: %v", err)
 	}
 
-	// Check the connection
-	err = client.Ping(context.Background(), nil)
+	err = services.StoreRedditPosts(topics)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error storing Reddit posts: %v", err)
 	}
-	fmt.Println("Connected to MongoDB!")
-	return client
-}
 
-func initRedis() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-		Password: "",
-		DB: 0,
+	log.Println("Reddit trending topics successfully fetched and stored in MongoDB.")
+
+	router := mux.NewRouter()
+	router.HandleFunc("/trending", handlers.TrendingTopicsHandler).Methods("GET")
+
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedHeaders:   []string{"Content-Type"},
+		AllowCredentials: true,
 	})
 
-	_, err := redisClient.Ping(context.Background()).Result()
+	handler := c.Handler(router)
+
+	response, err := services.FetchRedditTrendingTopics()
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Connected to Redis!")
-}
-
-func main() {
-	initMongo()
-	initRedis()
+	fmt.Print(response)
+	fmt.Println("Server is running on port 8080")
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
