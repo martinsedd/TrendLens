@@ -18,23 +18,27 @@ import (
 )
 
 const (
-	RedditAuthURL   = "https://www.reddit.com/api/v1/access_token"
-	RedditAPIURL    = "https://oauth.reddit.com"
-	RedditUserAgent = "TrendlensBot/0.1 by Due_Effective477"
+	RedditAuthURL   = "https://www.reddit.com/api/v1/access_token" // URL for Reddit authentication
+	RedditAPIURL    = "https://oauth.reddit.com"                   // Base URL for Reddit API
+	RedditUserAgent = "TrendlensBot/0.1 by Due_Effective477"       // User agent string for Reddit requests
 )
 
+// Token represents the structure of the access token received from Reddit.
 type Token struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
+	AccessToken string `json:"access_token"` // The access token for authenticating API requests
+	TokenType   string `json:"token_type"`   // The type of token (typically "bearer")
+	ExpiresIn   int    `json:"expires_in"`   // The expiration time of the token in seconds
 }
 
+// FetchRedditAccessToken retrieves an access token from Reddit using the password grant type.
+// It returns the access token as a string or an error if the request fails.
 func FetchRedditAccessToken() (string, error) {
 	clientID := config.GetEnv("REDDIT_CLIENT_ID", "")
 	clientSecret := config.GetEnv("REDDIT_CLIENT_SECRET", "")
 	username := config.GetEnv("REDDIT_USERNAME", "")
 	password := config.GetEnv("REDDIT_PASSWORD", "")
 
+	// Prepare data for the POST request
 	data := url.Values{}
 	data.Set("grant_type", "password")
 	data.Set("username", username)
@@ -45,7 +49,7 @@ func FetchRedditAccessToken() (string, error) {
 		return "", fmt.Errorf("failed to create auth request: %v", err)
 	}
 
-	req.SetBasicAuth(clientID, clientSecret)
+	req.SetBasicAuth(clientID, clientSecret) // Set basic auth credentials
 	req.Header.Add("User-Agent", RedditUserAgent)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
@@ -54,6 +58,7 @@ func FetchRedditAccessToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to execute auth request: %v", err)
 	}
+	defer res.Body.Close() // Ensure response body is closed
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -65,11 +70,13 @@ func FetchRedditAccessToken() (string, error) {
 		return "", fmt.Errorf("failed to parse response body: %v", err)
 	}
 
-	return token.AccessToken, nil
+	return token.AccessToken, nil // Return the access token
 }
 
+// FetchRedditTrendingPosts retrieves the trending posts from Reddit's "hot" section.
+// It returns a slice of TrendingPost models or an error if the request fails.
 func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
-	accessToken, err := FetchRedditAccessToken()
+	accessToken, err := FetchRedditAccessToken() // Get access token
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +86,7 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 		return nil, fmt.Errorf("failed to create Reddit API request: %v", err)
 	}
 
-	req.Header.Add("Authorization", "Bearer "+accessToken)
+	req.Header.Add("Authorization", "Bearer "+accessToken) // Set the authorization header
 	req.Header.Add("User-Agent", RedditUserAgent)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -87,12 +94,7 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to send Reddit API request: %v", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}(res.Body)
+	defer res.Body.Close() // Ensure response body is closed
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -118,8 +120,9 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 	for _, post := range posts {
 		postData, ok := post.(map[string]interface{})["data"].(map[string]interface{})
 		if !ok {
-			continue
+			continue // Skip malformed post data
 		}
+		// Append the trending post to the slice
 		trendingPosts = append(trendingPosts, models.TrendingPost{
 			ID:         postData["id"].(string),
 			Name:       postData["title"].(string),
@@ -127,15 +130,18 @@ func FetchRedditTrendingPosts() ([]models.TrendingPost, error) {
 			VolumeDown: int(postData["downs"].(float64)),
 		})
 	}
-	return trendingPosts, nil
+	return trendingPosts, nil // Return the slice of trending posts
 }
 
+// StoreRedditPosts stores or updates the trending posts in the MongoDB collection.
+// It performs sentiment analysis on the post titles and keeps track of voting history.
 func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost) error {
-	analyzer := govader.NewSentimentIntensityAnalyzer()
+	analyzer := govader.NewSentimentIntensityAnalyzer() // Initialize the sentiment analyzer
 
 	for _, post := range posts {
-		sentiment := analyzer.PolarityScores(post.Name)
+		sentiment := analyzer.PolarityScores(post.Name) // Analyze sentiment of the post title
 
+		// Determine the sentiment label based on the compound score
 		sentimentLabel := "neutral"
 		if sentiment.Compound >= 0.05 {
 			sentimentLabel = "positive"
@@ -143,7 +149,7 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 			sentimentLabel = "negative"
 		}
 
-		filter := bson.M{"id": post.ID}
+		filter := bson.M{"id": post.ID} // Create a filter for MongoDB query
 		var existingPost models.RedditPost
 
 		err := collection.FindOne(context.Background(), filter).Decode(&existingPost)
@@ -151,6 +157,7 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 			return fmt.Errorf("error fetching Reddit post from MongoDB: %v", err)
 		}
 
+		// Prepare the update for the MongoDB document
 		update := bson.M{
 			"$set": bson.M{
 				"title":       post.Name,
@@ -165,6 +172,7 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 		}
 
 		if existingPost.ID != "" {
+			// Track upvote history if the upvotes have changed
 			if existingPost.Upvotes != post.VolumeUp {
 				upvoteEntry := models.VoteHistoryEntry{
 					Value:     post.VolumeUp,
@@ -172,6 +180,7 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 				}
 				update["$push"] = bson.M{"upvote_history": upvoteEntry}
 			}
+			// Track downvote history if the downvotes have changed
 			if existingPost.Downvotes != post.VolumeDown {
 				downvoteEntry := models.VoteHistoryEntry{
 					Value:     post.VolumeDown,
@@ -204,15 +213,17 @@ func StoreRedditPosts(collection *mongo.Collection, posts []models.TrendingPost)
 	return nil
 }
 
+// RetrieveRedditData retrieves all Reddit posts from the specified MongoDB collection.
+// It returns a slice of RedditPost models or an error if the retrieval fails.
 func RetrieveRedditData(collection *mongo.Collection) ([]models.RedditPost, error) {
-	filter := bson.M{}
+	filter := bson.M{} // Empty filter to retrieve all documents
 
 	cursor, err := collection.Find(context.Background(), filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Reddit posts from MongoDB: %v", err)
 	}
 	defer func(cursor *mongo.Cursor, ctx context.Context) {
-		err := cursor.Close(ctx)
+		err := cursor.Close(ctx) // Ensure the cursor is closed after usage
 		if err != nil {
 			fmt.Println("Failed to close cursor: ", err)
 		}
@@ -223,5 +234,5 @@ func RetrieveRedditData(collection *mongo.Collection) ([]models.RedditPost, erro
 		return nil, fmt.Errorf("failed to decode Reddit posts from cursor: %v", err)
 	}
 
-	return posts, nil
+	return posts, nil // Return the slice of retrieved posts
 }

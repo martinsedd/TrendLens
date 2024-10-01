@@ -1,14 +1,35 @@
 version: "3.8"
 services:
-  mongodb:
+  backend:
+    build: .
+    container_name: trendlens_backend
+    ports:
+        - "8080:8080"
+    environment:
+      MONGODB_URI: "mongodb://mongo:27017/trendlens_db"
+      REDIS_URL: "redis://redis:6379"
+    depends_on:
+        - mongo
+        - redis
+    restart: unless-stopped
+
+  mongo:
     image: mongo:latest
-    container_name: mongo_ts
+    container_name: mongo
     ports:
       - "27017:27017"
     volumes:
-      - ./data:/data/db
+      - /media/martinsedd/Bridge/Projects/trendlens/DATA
+    restart: unless-stopped
+
+
   redis:
     image: redis:alpine
     container_name: redis_ts
     ports:
       - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:
+    driver: local

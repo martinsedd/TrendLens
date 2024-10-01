@@ -1,0 +1,82 @@
+1. Environment Configuration
+
+    GetEnv Function:
+        Retrieves environment variables with a fallback to a default value.
+        Logs a message when a default value is used.
+
+2. MongoDB Client Management
+
+    InitializeMongoClient Function:
+        Connects to MongoDB using the connection URI from environment variables.
+        Sets connection options, including maximum and minimum pool sizes and connection idle time.
+        Pings the database to verify the connection.
+        Initializes a global MongoClient variable for application-wide access.
+
+    DisconnectMongoClient Function:
+        Disconnects the MongoDB client when it is no longer needed, logging success or failure.
+
+3. HTTP Handlers
+
+    TrendingHandler:
+        Handles HTTP requests to fetch trending posts from Reddit.
+        Calls FetchRedditTrendingPosts() and returns a JSON response with the trending posts or an error message.
+
+    FetchTrendingInDB:
+        Retrieves trending posts from the MongoDB collection and returns them as a JSON response.
+        Logs errors encountered during the retrieval process.
+
+    FetchFilteredPostsHandler:
+        Handles requests for posts filtered by sentiment, supporting pagination through limit and page query parameters.
+        Constructs a MongoDB filter based on the sentiment.
+        Retrieves filtered posts from MongoDB and encodes them as a JSON response.
+
+4. Data Models
+
+    VoteHistoryEntry Struct:
+        Represents an entry in the voting history with the vote value and timestamp.
+
+    RedditPost Struct:
+        Defines the structure for storing Reddit posts in MongoDB, including fields for title, upvotes, downvotes, and voting history.
+
+    TrendingPost Struct:
+        Represents a trending post with fields for ID, name, and volume of upvotes and downvotes.
+
+5. Scheduler
+
+    StartRedditScheduler Function:
+        Initializes a scheduler to fetch trending posts from Reddit every 5 minutes.
+        Calls FetchRedditTrendingPosts() and stores the fetched posts in the MongoDB collection.
+
+6. Reddit API Interaction
+
+    FetchRedditAccessToken Function:
+        Obtains an access token from Reddit using the password grant type.
+        Handles errors during the request and response parsing.
+
+    FetchRedditTrendingPosts Function:
+        Uses the access token to send a request to Reddit's API for trending posts.
+        Parses the API response to extract relevant post data and returns a slice of TrendingPost.
+
+7. Data Storage
+
+    StoreRedditPosts Function:
+        Stores or updates trending posts in the MongoDB collection.
+        Performs sentiment analysis on post titles and updates voting history.
+        Uses upsert to insert new posts or update existing ones based on their ID.
+
+    RetrieveRedditData Function:
+        Fetches all Reddit posts from the specified MongoDB collection.
+        Returns a slice of RedditPost models.
+
+8. Error Handling and Logging
+
+    Throughout the functions, errors are handled with appropriate logging to provide feedback on failures during operations (e.g., fetching posts, connecting to MongoDB).
+    User-friendly error messages are returned for HTTP responses when operations fail.
+
+9. Sentiment Analysis
+
+    Utilizes the govader library to perform sentiment analysis on Reddit post titles.
+    Classifies titles as "positive", "negative", or "neutral" based on sentiment scores.
+
+
+    MONGO_URI=mongodb://localhost:27017/trendlens

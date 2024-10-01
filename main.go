@@ -11,12 +11,13 @@ import (
 	"net/http"
 )
 
-func main() {
+func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
+}
+func main() {
 	client := config.InitializeMongoClient()
 	collection := client.Database("trendlens").Collection("reddit_posts")
 
